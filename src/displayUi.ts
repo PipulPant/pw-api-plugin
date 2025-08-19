@@ -5,6 +5,16 @@ import hljs from 'highlight.js/lib/common';
 import * as packageJSON from '../package.json'
 import { Page, test } from '@playwright/test';
 
+// Load the color scheme dynamically
+const supportedThemes = ['light', 'dark', 'accessible'];
+const envColorScheme = process.env.COLOR_SCHEME;
+
+const theme = supportedThemes.includes((envColorScheme || '').toLowerCase())
+    ? (envColorScheme || '').toLowerCase()
+    : 'light';
+
+const colorScheme = require(`./color-scheme/${theme}.json`);
+
 // Obtain the version of highlight.js from package.json
 const hljsVersion: string = packageJSON['dependencies']['highlight.js'].replace(/[\^~]/g, '');
 
@@ -251,35 +261,41 @@ const formatJson = (jsonObject: object): string => {
     }).value;
 }
 
+
 /**
  * Inline styles for the application.
  */
 const inLineStyles = `<style>
-    .pw-card { box-shadow: 0 4px 8px 0 rgba(0,0,0,0.3); transition: 0.3s; }
-    .pw-card:hover { box-shadow: 0 8px 16px 0 rgba(0,0,0,0.5); background-color: rgb(173, 216, 230);}
-    .pw-api-container { color: rgb(40, 40, 40); }
-    .pw-api-call { background-color: rgb(200, 230, 240); border-radius: 8px; margin: 35px 12px; padding: 10px 15px; text-align: left; font-family: monospace; }
+    .pw-card { box-shadow: 0 4px 8px 0 ${colorScheme.cardShadow}; transition: 0.3s; }
+    .pw-card:hover { box-shadow: 0 8px 16px 0 ${colorScheme.cardShadowHover}; background-color: ${colorScheme.cardBackgroundHover};}
+    .pw-api-container { color: ${colorScheme.cardColor}; }
+    .pw-api-call { background-color: ${colorScheme.cardBackground}; border-radius: 8px; margin: 35px 12px; padding: 10px 15px; text-align: left; font-family: monospace; }
     .pw-api-request { text-align: left; padding-bottom: 1em; }
     .pw-api-response { text-align: left; margin-top: 1em; }
-    .pw-api-request .title, .pw-api-response .title { font-weight: 800; font-size: 1.8em; line-height: 2em; padding-bottom: 18px; }
-    .pw-api-request .title-property, .pw-api-response .title-property { color: rgb(60, 60, 60); font-weight: 800; font-size: 1.3em; }
-    .property { padding: 10px 0px; cursor: pointer;display: flex; color: rgb(70, 70, 70); font-weight: 800; font-size: 1.2em; margin: 10px 0 0 10px; border-radius: 6px 6px 0 0; }
+    .pw-api-request .title, .pw-api-response .title { color: ${colorScheme.cardColor}; font-weight: 800; font-size: 1.8em; line-height: 2em; padding-bottom: 18px; }
+    .pw-api-request .title-property, .pw-api-response .title-property { color: ${colorScheme.cardSecondaryColor}; font-weight: 800; font-size: 1.3em; }
+    .property { padding: 10px 0px; cursor: pointer;display: flex; color: ${colorScheme.tabLabelColor}; font-weight: 800; font-size: 1.2em; margin: 10px 0 0 10px; border-radius: 6px 6px 0 0; }
     .pw-api-hljs { font-size: 1.1em;}
-    .pw-api-1xx { color: rgb(3, 152, 158)!important; }
-    .pw-api-2xx { color: rgb(0, 128, 54)!important; }
-    .pw-api-3xx { color: rgb(217, 98, 32)!important; }
-    .pw-api-4xx { color: rgb(200, 0, 0)!important; }
-    .pw-api-5xx { color: rgb(160, 20, 28)!important; }
-    .hljs { background: rgb(238, 251, 255); text-wrap: wrap; overflow-wrap: break-word; padding: 6px; margin: 1px 0 15px 10px; border-radius: 6px 6px 6px 6px; line-height: 1.5em; }
 
-    .pw-always-selected { flex-wrap: wrap; background: rgb(238, 251, 255); }
+    .pw-api-1xx { color: ${colorScheme.status1xxColor}!important; }
+    .pw-api-2xx { color: ${colorScheme.status2xxColor}!important; }
+    .pw-api-3xx { color: ${colorScheme.status3xxColor}!important; }
+    .pw-api-4xx { color: ${colorScheme.status4xxColor}!important; }
+    .pw-api-5xx { color: ${colorScheme.status5xxColor}!important; }
+
+    .pw-always-selected { flex-wrap: wrap; background: ${colorScheme.cardDataBackground}; }
     .pw-data-tabs { display: flex; flex-wrap: wrap; }
     .pw-data-tabs [type="radio"] { display: none; }
-    .pw-tab-label { padding: 10px 16px; cursor: pointer; border-width: 2px 1px 0 1px; border-radius: 6px 6px 0 0; border-color: rgb(238, 251, 255); border-style: solid; }
-    .pw-tab-label:hover { color: rgb(9, 128, 133); }
+    .pw-tab-label { padding: 10px 16px; cursor: pointer; border-width: 4px 3px 0 3px; border-radius: 6px 6px 0 0; border-color: ${colorScheme.cardDataBackground}; border-style: solid; }
+    .pw-tab-label:hover { color: ${colorScheme.tabLabelColorHover}; }
     .pw-tab-content { width: 100%; order: 1; display: none; }
     .pw-data-tabs [type="radio"]:checked + label + .pw-tab-content { display: block; }
-    .pw-data-tabs [type="radio"]:checked + label { background: rgb(238, 251, 255); border: 0px;}
+    .pw-data-tabs [type="radio"]:checked + label { background: ${colorScheme.tabBackground}; border: 0px;}
+
+    .hljs { color: ${colorScheme.cardDataColor}; background: ${colorScheme.cardDataBackground}; text-wrap: wrap; overflow-wrap: break-word; padding: 6px; margin: 1px 0 15px 10px; border-radius: 6px 6px 6px 6px; line-height: 1.5em; }
+    .hljs-attr { color: ${colorScheme.cardDataAttrColor}; }
+    .hljs-addition, .hljs-attribute, .hljs-literal, .hljs-section, .hljs-string, .hljs-template-tag, .hljs-template-variable, .hljs-title, .hljs-type { color: ${colorScheme.cardDataStrColor}; }
+    .hljs-built_in, .hljs-keyword, .hljs-name, .hljs-selector-tag, .hljs-tag { color: ${colorScheme.cardDataBoolean}; }
 </style>`
 
 export { addApiCardToUI }

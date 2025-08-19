@@ -1,0 +1,24 @@
+{
+    "cardColor": "#DDE3EA",
+    "cardSecondaryColor": "#A9B4BF",
+    "cardBackground": "#0B0F14",
+    "cardBackgroundHover": "#080B0F",
+    "cardShadow": "#00000099",
+    "cardShadowHover": "#000000CC",
+
+    "tabLabelColor": "#DDE3EA",
+    "tabLabelColorHover": "#33E6FF",
+    "tabBackground": "#1A2333",
+
+    "cardDataColor": "#F2F7FA",
+    "cardDataBackground": "#1A2333",
+    "cardDataAttrColor": "#FF4D4D",
+    "cardDataStrColor": "#FFB878",
+    "cardDataBoolean" : "#87AFFF",
+
+    "status1xxColor": "#00E5FF",
+    "status2xxColor": "#22E776",
+    "status3xxColor": "#FFC83D",
+    "status4xxColor": "#FF6A00",
+    "status5xxColor": "#FF1744"
+}

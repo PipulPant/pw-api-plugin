@@ -27,6 +27,8 @@ Playwright plugin for comprehensive API testing and result presentation using th
   - Response tabs: `Body`, `Headers`.
 
   - Environment variables **`LOG_API_UI`** and **`LOG_API_REPORT`** to enable the display of API call details in **Playwright UI**/**Trace Viewer**, and **HTML Report** respectively. _(Introduced in v2.0.0)_
+  
+  - Environment variable **`COLOR_SCHEME`** to select the desired theme to display results in the **Playwright UI**/**Trace Viewer**, and **HTML Report** (`light`, `dark`, and `accessible`). _(Introduced in v2.1.0)_
 
 - Supports multiple API calls within a single test, allowing testing multiple endpoints as part of the same test scenario.
 
@@ -49,7 +51,7 @@ Playwright plugin for comprehensive API testing and result presentation using th
       - [✔️ `pwApi.post({ request[, page] }, url[, options])`](#️-pwapipost-request-page--url-options)
       - [✔️ `pwApi.put({ request[, page] }, url[, options])`](#️-pwapiput-request-page--url-options)
       - [✔️ `pwApi.patch({ request[, page] }, url[, options])`](#️-pwapipatch-request-page--url-options)
-    - [Axios API](#axios-api-1)
+    - [axiosApi](#axiosapi)
       - [✔️ `axiosApi.axios({ [page] }, config)` and `axiosApi.axios({ [page] }, url[, config])`](#️-axiosapiaxios-page--config-and-axiosapiaxios-page--url-config)
       - [✔️ `axiosApi.request({ [page] }, config)`](#️-axiosapirequest-page--config)
       - [✔️ `axiosApi.get({ [page] }, url[, config])`](#️-axiosapiget-page--url-config)
@@ -69,12 +71,16 @@ Playwright plugin for comprehensive API testing and result presentation using th
     - [Extension of the `test` function](#extension-of-the-test-function)
     - [Playwright Native API](#playwright-native-api-1)
       - [Examples](#examples)
-    - [Axios API](#axios-api-2)
+    - [Axios API](#axios-api-1)
       - [Examples](#examples-1)
   - [PRESENTATION OF RESULTS](#presentation-of-results)
     - [In Playwright User Interface](#in-playwright-user-interface)
     - [In Playwright HTML Report](#in-playwright-html-report)
     - [Trace Viewer](#trace-viewer)
+    - [Color Schemes](#color-schemes)
+      - [Light Color Scheme (default)](#light-color-scheme-default)
+      - [Dark Color Scheme](#dark-color-scheme)
+      - [Accesasible Color Scheme](#accesasible-color-scheme)
   - [LICENSE](#license)
   - [CONTRIBUTING](#contributing)
   - [COLABORATORS](#colaborators)
@@ -110,7 +116,7 @@ import { pwAxios, test } from 'pw-api-plugin';
 
 ## API REFERENCE
 
-### **`pwApi`*
+### Playwright Native API
 
 Class providing methods to make HTTP requests using Playwright native API and log the request and response data on the Playwright UI.
 
@@ -200,7 +206,7 @@ Class function that makes a PATCH request to the specified URL and logs the requ
 
 ---
 
-### **`axiosApi`**
+### axiosApi
 
 Class providing methods to make HTTP requests using Axios API and log the request and response data on the Playwright UI.
 
@@ -361,6 +367,9 @@ The plugin provides two environment variables to control when the details of the
 - When the environment variable **`LOG_API_UI`** is set to **`"false"`**, the API request and response information is NOT displayed in the **Playwright UI** and **Trace Viewer** in a user-friendly format. By default, these results are shown.
 
 - If the environment variable **`LOG_API_REPORT`** is set to **`"true"`**, the details of the API request and response are included as attachments in the **HTML Report**. By default, these results are not attached.
+
+- The environment variable **`COLOR_SCHEME`** allows you to select the desired theme for displaying results in the **Playwright UI**, **Trace Viewer**, and **HTML Report**. Supported values are: `light`, `dark`, `accessible`. If no value is specified, the theme will default to `light`.
+
 
 #### Setting Environment Variables in the Terminal
 
@@ -846,6 +855,40 @@ npx playwright test --trace=on
 _Details of an API request, along with its response, are included in the Trace Viewer._
 
 
+### Color Schemes
+
+The plugin supports 3 color schemes for presenting results by configuring the environment variable `COLOR_SCHEME`: `light`, `dark`, `accessible`.
+
+#### Light Color Scheme (default)
+
+Designed with a balanced combination of light tones, it is intended for general use and provides a visually comfortable experience for most users.
+
+This is the theme that will be used if the `COLOR_SCHEME` environment variable is not provided. If you want to explicitly use the default theme, you can also set the variable to `light`.
+
+![Default color scheme](images/light-theme.png)
+
+#### Dark Color Scheme
+
+Used for low-light environments or scenarios where reducing screen glare is necessary. It offers a dark background with lighter text for improved readability in dark surroundings.
+
+To enable, set the `COLOR_SCHEME` environment variable to `dark`.
+
+![Dark color scheme](images/dark-theme.png)
+
+#### Accesasible Color Scheme
+
+Designed for users with visual impairments or other accessibility needs, this scheme provides high-contrast colors and complies with WCAG 2.1 AA accessibility standards. It enhances readability and improves usability for diverse audiences.
+
+To enable, set the `COLOR_SCHEME` environment variable to `accessible`.
+
+![Accessible color scheme](images/accessible-theme.png)
+
+
+Video showcasing the available color schemes:
+
+![Overview](videos/color-schemes.gif)
+
+
 ## LICENSE
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
@@ -878,9 +921,12 @@ Thank you for your support!
 
 ## CHANGELOG
 
+### [2.1.0]
+- New environment variable `COLOR_SCHEME`: Select the desired theme to display results in the (`light` by default).
+
 ### [2.0.2]
 - Fix hover information for public functions.
-  
+
 ### [2.0.1]
 - Resolve import issue (contribution by [Mohammad Monfared](https://www.linkedin.com/in/monfared/ "Mohammad Monfared")).
 
