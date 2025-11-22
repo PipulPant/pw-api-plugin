@@ -2,6 +2,8 @@ import type { RequestDataInterface, ResponseDataInterface } from './types.js';
 
 
 import hljs from 'highlight.js/lib/common';
+// @ts-ignore - js-beautify doesn't have type definitions
+import * as jsBeautify from 'js-beautify';
 import * as packageJSON from '../package.json'
 import { Page, test } from '@playwright/test';
 
@@ -35,18 +37,37 @@ const addApiCardToUI = async (requestData: RequestDataInterface, responseData: R
     const apiCallHtml = await createApiCallHtml(requestData, responseData);
 
     if (page && process.env.LOG_API_UI !== 'false') {
-
-        // Add HTM of each API call to the specific Action
         const html = await createPageHtml(apiCallHtml);
-        await page.setContent(html);
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
 
-        // Add API at the end of the Playwright UI page
-        // const currentHtml = await page.content();
-        // if (currentHtml === emptyPageHtml) {
-        //     html = await createPageHtml(apiCallHtml);
-        // } else {
-        //     html = await addApiCallHtml(currentHtml, apiCallHtml);
-        // }
+        // After setContent, ensure all iframes with data-html-base64 are loaded
+        // This ensures HTML rendering works properly
+        try {
+            await page.evaluate(() => {
+                const containers = document.querySelectorAll('[data-html-base64]');
+                containers.forEach((container) => {
+                    const base64 = container.getAttribute('data-html-base64');
+                    if (base64) {
+                        const iframe = container.parentElement?.querySelector('iframe');
+                        if (iframe && !iframe.src) {
+                            try {
+                                const binaryString = atob(base64);
+                                const bytes = new Uint8Array(binaryString.length);
+                                for (let i = 0; i < binaryString.length; i++) {
+                                    bytes[i] = binaryString.charCodeAt(i);
+                                }
+                                const blob = new Blob([bytes], { type: 'text/html;charset=utf-8' });
+                                iframe.src = URL.createObjectURL(blob);
+                            } catch (e) {
+                                console.error('Error loading HTML in iframe:', e);
+                            }
+                        }
+                    }
+                });
+            });
+        } catch (e) {
+            console.warn('Could not initialize HTML iframes:', e);
+        }
     }
 
 }
@@ -133,7 +154,7 @@ const createApiCallHtmlRequest = async (requestData: RequestDataInterface, callI
         <label class="property">URL</label>
         <pre class="hljs pw-api-hljs">${url}</b></pre>
         <div class="pw-req-data-tabs-${callId} pw-data-tabs">
-            ${await createRequestTab(requestBody, 'BODY', callId, true) /* Open BODY tab by default */ }
+            ${await createRequestTab(requestBody, 'BODY', callId, true) /* Open BODY tab by default */}
             ${await createRequestTab(requestHeaders, 'HEADERS', callId)}
             ${await createRequestTab(requestParams, 'PARAMS', callId)}
             ${await createRequestTab(requestAuth, 'HTTP BASIC AUTH', callId)}
@@ -176,17 +197,70 @@ const createApiCallHtmlResponse = async (responseData: ResponseDataInterface, ca
     const statusClass = responseData.statusClass;
     const statusText = responseData.statusText;
     const responseHeaders = responseData.headers ? formatJson(responseData.headers) : undefined;
-    const responseBody = responseData.body ? formatJson(responseData.body) : undefined;
+
+    // Check if body is HTML/text content (has _rawText property)
+    let responseBody: string | undefined;
+    let isHtmlResponse = false;
+    let rawHtmlText: string | null = null;
+    if (responseData.body) {
+        if ((responseData.body as any)._rawText !== undefined && (responseData.body as any)._contentType !== undefined) {
+            // This is HTML/text content
+            const contentType = (responseData.body as any)._contentType;
+            const rawText = (responseData.body as any)._rawText;
+
+            // Determine language for syntax highlighting
+            let language = 'plaintext';
+            const trimmedText = rawText.trim();
+
+            // Check content-type first
+            if (contentType.includes('html')) {
+                language = 'html';
+                isHtmlResponse = true;
+                rawHtmlText = rawText;
+            } else if (contentType.includes('xml')) {
+                language = 'xml';
+            } else if (contentType.includes('css')) {
+                language = 'css';
+            } else if (contentType.includes('javascript')) {
+                language = 'javascript';
+            } else if (trimmedText.startsWith('<!DOCTYPE') || trimmedText.startsWith('<html')) {
+                // Detect HTML by content even if content-type doesn't indicate it
+                language = 'html';
+                isHtmlResponse = true;
+                rawHtmlText = rawText;
+            } else if (trimmedText.startsWith('<?xml')) {
+                // Detect XML by content
+                language = 'xml';
+            }
+
+            responseBody = formatText(rawText, language);
+        } else {
+            // This is regular JSON
+            responseBody = formatJson(responseData.body);
+        }
+    }
+
     const responseDuration = responseData.duration;
-    const durationMsg = responseDuration ? 'Duration aprox. ' + (responseDuration < 1000 ? `${responseDuration}ms` : `${(responseDuration / 1000).toFixed(2)}s`) : ''
+    const durationMsg = responseDuration ? 'Duration aprox. ' + (responseDuration < 1000 ? `${responseDuration}ms` : `${(responseDuration / 1000).toFixed(2)}s`) : '';
+
+    // Build tabs - add RENDERED tab for HTML responses
+    let tabsHtml = '';
+    if (isHtmlResponse && rawHtmlText) {
+        // For HTML, show RENDERED tab first, then BODY (code), then HEADERS
+        tabsHtml += await createResponseTabRendered(rawHtmlText, 'RENDERED', callId, true) /* Open RENDERED tab by default for HTML */;
+        tabsHtml += await createResponseTab(responseBody, 'BODY', callId);
+    } else {
+        // For non-HTML, show BODY tab first
+        tabsHtml += await createResponseTab(responseBody, 'BODY', callId, true) /* Open BODY tab by default */;
+    }
+    tabsHtml += await createResponseTab(responseHeaders, 'HEADERS', callId);
 
     return `<div class="pw-api-response">
         <label class="title">RESPONSE - </label>
         <label class="title-property pw-api-${statusClass}">(STATUS: ${status} - ${statusText})</label><label class="title-property"> - ${durationMsg}</label>
         <br>
         <div class="pw-res-data-tabs-${callId} pw-data-tabs">
-            ${await createResponseTab(responseBody, 'BODY', callId, true) /* Open BODY tab by default */ }
-            ${await createResponseTab(responseHeaders, 'HEADERS', callId)}
+            ${tabsHtml}
          </div>
     </div>`
 }
@@ -261,6 +335,131 @@ const formatJson = (jsonObject: object): string => {
     }).value;
 }
 
+/**
+ * Formats text content (HTML, XML, plain text) into a highlighted string.
+ * Uses js-beautify to beautify the code first, then applies syntax highlighting.
+ *
+ * @param text - The text content to format.
+ * @param language - The language for syntax highlighting (e.g., 'html', 'xml', 'plaintext').
+ * @returns The formatted text string with syntax highlighting.
+ */
+const formatText = (text: string, language: string = 'plaintext'): string => {
+    let beautifiedText = text;
+
+    // Use js-beautify to beautify the code based on language
+    try {
+        if (language === 'html' || language === 'xml') {
+            beautifiedText = jsBeautify.html(text, {
+                indent_size: 2,
+                indent_char: ' ',
+                max_preserve_newlines: 2,
+                preserve_newlines: true,
+                keep_array_indentation: false,
+                break_chained_methods: false,
+                indent_scripts: 'separate',
+                brace_style: 'collapse',
+                space_before_conditional: true,
+                unescape_strings: false,
+                wrap_line_length: 120,
+                end_with_newline: false,
+                indent_inner_html: true,
+                indent_body_inner_html: true,
+                indent_head_inner_html: true,
+                extra_liners: ['head', 'body', '/html']
+            });
+        } else if (language === 'css') {
+            beautifiedText = jsBeautify.css(text, {
+                indent_size: 2,
+                indent_char: ' ',
+                max_preserve_newlines: 2,
+                preserve_newlines: true,
+                wrap_line_length: 120,
+                end_with_newline: false
+            });
+        } else if (language === 'javascript') {
+            beautifiedText = jsBeautify.js(text, {
+                indent_size: 2,
+                indent_char: ' ',
+                max_preserve_newlines: 2,
+                preserve_newlines: true,
+                keep_array_indentation: false,
+                break_chained_methods: false,
+                brace_style: 'collapse',
+                space_before_conditional: true,
+                unescape_strings: false,
+                wrap_line_length: 120,
+                end_with_newline: false
+            });
+        }
+    } catch (e) {
+        // If beautification fails, use original text
+        beautifiedText = text;
+    }
+
+    // Apply syntax highlighting
+    return hljs.highlight(beautifiedText, {
+        language: language,
+    }).value;
+}
+
+/**
+ * Creates an HTML string for a rendered HTML response tab that displays HTML in an iframe.
+ *
+ * @param htmlContent - The raw HTML content to render.
+ * @param tabLabel - The label for the tab.
+ * @param callId - The unique identifier for the call.
+ * @param checked - Optional. If `true`, the tab will be marked as checked. Defaults to `false`.
+ * @returns A promise that resolves to an HTML string representing the rendered HTML tab.
+ */
+const createResponseTabRendered = async (htmlContent: string, tabLabel: string, callId: number, checked?: boolean): Promise<string> => {
+    const tabLabelForId = tabLabel.toLowerCase().replace(' ', '-');
+
+    if (!htmlContent) {
+        return '';
+    }
+
+    const iframeId = `res-${tabLabelForId}-${callId}`;
+    const dataContainerId = `data-container-${iframeId}`;
+
+    // Encode HTML content to base64 for storage in data attribute
+    // Buffer is always available in Node.js environment
+    let base64Html = '';
+    try {
+        base64Html = Buffer.from(htmlContent, 'utf8').toString('base64');
+    } catch (e) {
+        console.warn('Failed to encode HTML to base64:', e);
+    }
+
+    // Create iframe with hidden container storing base64 HTML
+    // The iframe will be loaded via page.evaluate() in addApiCardToUI
+    // Inline script kept as fallback for immediate loading
+    return ` <input type="radio" name="pw-res-data-tabs-${callId}" id="pw-res-${tabLabelForId}-${callId}" ${checked ? 'checked="checked"' : ''}>
+        <label for="pw-res-${tabLabelForId}-${callId}" class="property pw-tab-label">${tabLabel.toUpperCase()}</label>
+        <div class="pw-tab-content">
+            <div id="${dataContainerId}" data-html-base64="${base64Html}" style="display: none;"></div>
+            <iframe id="${iframeId}" class="pw-html-render-frame" style="width: 100%; min-height: 400px; border: 1px solid #ddd; border-radius: 4px; background: white;"></iframe>
+            <script>
+                (function() {
+                    try {
+                        var container = document.getElementById('${dataContainerId}');
+                        var iframe = document.getElementById('${iframeId}');
+                        var base64 = container?.getAttribute('data-html-base64');
+                        if (base64 && iframe && !iframe.src) {
+                            var binaryString = atob(base64);
+                            var bytes = new Uint8Array(binaryString.length);
+                            for (var i = 0; i < binaryString.length; i++) {
+                                bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            iframe.src = URL.createObjectURL(new Blob([bytes], { type: 'text/html;charset=utf-8' }));
+                        }
+                    } catch (e) {
+                        console.error('Error loading HTML in iframe:', e);
+                    }
+                })();
+            </script>
+        </div>`;
+}
+
 
 /**
  * Inline styles for the application.
@@ -296,6 +495,8 @@ const inLineStyles = `<style>
     .hljs-attr { color: ${colorScheme.cardDataAttrColor}; }
     .hljs-addition, .hljs-attribute, .hljs-literal, .hljs-section, .hljs-string, .hljs-template-tag, .hljs-template-variable, .hljs-title, .hljs-type { color: ${colorScheme.cardDataStrColor}; }
     .hljs-built_in, .hljs-keyword, .hljs-name, .hljs-selector-tag, .hljs-tag { color: ${colorScheme.cardDataBoolean}; }
+    
+    .pw-html-render-frame { width: 100%; min-height: 400px; max-height: 800px; border: 1px solid ${colorScheme.cardDataBackground}; border-radius: 6px; margin: 1px 0 15px 10px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 </style>`
 
 export { addApiCardToUI }
